@@ -25,7 +25,8 @@ from pathlib import Path
 
 from PIL import Image
 
-from pptx_generator import generate_pptx
+from build_pptx_slides import build_all_slides
+from pptx_helper import create_presentation
 from studio_api import StudioClient
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,8 @@ def _download_sample_images(client: StudioClient, project_map: dict, images_dir:
         view_dir.mkdir(parents=True, exist_ok=True)
 
         if kind in ("TAG", "CLA"):
-            _download_one_per_concept(client, view_id, view_label, tag_ids, concept_map, view_dir, crop=is_child_of_det)
+            _download_one_per_concept(client, view_id, view_label, tag_ids,
+                                      concept_map, view_dir, crop=is_child_of_det)
         elif kind == "DET":
             _download_best_det_image(client, view_id, view_label, tag_ids, concept_map, view_dir)
         else:
@@ -335,8 +337,19 @@ def main(argv=None):
         _download_sample_images(client, project_map, images_dir)
 
     # Generate the PPTX
-    output = generate_pptx(project_map, args.output, images_dir=images_dir, org_slug=getattr(args, 'org', '') or '', project_slug=getattr(args, 'project', '') or '')
-    print(f"✅ Done → {output}")
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    prs = create_presentation()
+    build_all_slides(
+        prs,
+        project_map,
+        images_dir=images_dir,
+        org_slug=getattr(args, "org", "") or "",
+        project_slug=getattr(args, "project", "") or "",
+    )
+    prs.save(str(output_path))
+    print(f"✅ Done → {output_path}  ({len(prs.slides)} slides)")
 
 
 if __name__ == "__main__":
