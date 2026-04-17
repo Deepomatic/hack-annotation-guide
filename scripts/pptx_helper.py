@@ -1,15 +1,18 @@
+"""Reusable PPTX primitives and Studio helpers for annotation guide generation.
+
+This module contains:
+- Generic PPTX layout/style helpers (slides, text, shapes, images, grids)
+- Image download helpers (sample images from Studio API)
+
+All project-specific slide composition lives in build_pptx_slides.py.
+Do NOT add project-specific slides here.
 """
-Reusable PPTX primitives for building clean, modern presentations.
 
-This module contains NO project-specific logic — only generic helpers
-for creating slides, adding text, shapes, images, and layout utilities.
-
-Do not modify this file to add project-specific slides.
-Use build_pptx_slides.py for that.
-"""
-
+import io
 import logging
 from pathlib import Path
+
+from PIL import Image as PILImage
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -1352,3 +1355,208 @@ def build_concept_detail_slide(
 
     add_bottom_strip(slide, accent)
     return slide
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Image download helpers (from Studio API)
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _dl_sanitize(name: str) -> str:
+    """Turn a label into a safe filename component."""
+    return name.replace(" ", "_").replace("/", "-").replace("\\", "-")
+
+
+def _img_ext(region: dict) -> str:
+    """Extract image extension from a region dict, defaulting to .jpg."""
+    orig = region.get("image", {}).get("data", {}).get("filename", "")
+    ext = Path(orig).suffix if orig else ".jpg"
+    return ext or ".jpg"
+
+
+def _save_image(client, url: str, filepath: Path) -> bool:
+    """Download and save an image. Returns True on success."""
+    if filepath.exists():
+        logger.info("  Already exists: %s", filepath)
+        return True
+    try:
+        filepath.write_bytes(client.download_image(url))
+        logger.info("  Downloaded: %s", filepath)
+        return True
+    except Exception as exc:
+        logger.warning("  Failed to download %s: %s", filepath.name, exc)
+        return False
+
+
+def _save_cropped_image(client, url: str, bbox: dict, filepath: Path) -> bool:
+    """Download a full image, crop it to *bbox*, and save the crop."""
+    if filepath.exists():
+        logger.info("  Already exists: %s", filepath)
+        return True
+    try:
+        img_data = client.download_image(url)
+        img = PILImage.open(io.BytesIO(img_data))
+        w, h = img.size
+        left = int(bbox["xmin"] * w)
+        upper = int(bbox["ymin"] * h)
+        right = int(bbox["xmax"] * w)
+        lower = int(bbox["ymax"] * h)
+        crop = img.crop((left, upper, right, lower))
+        filepath = filepath.with_suffix(".png")
+        crop.save(filepath)
+        logger.info("  Cropped & saved: %s (%dx%d)", filepath, right - left, lower - upper)
+        return True
+    except Exception as exc:
+        logger.warning("  Failed to crop %s: %s", filepath.name, exc)
+        return False
+
+
+def _draw_bboxes(img: PILImage.Image, bboxes: list[dict], color=(255, 107, 53), thickness: int = 3) -> PILImage.Image:
+    """Draw normalized bboxes on a PIL image. Returns a copy with overlays."""
+    from PIL import ImageDraw
+    img = img.copy()
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    for bbox in bboxes:
+        x0 = int(bbox["xmin"] * w)
+        y0 = int(bbox["ymin"] * h)
+        x1 = int(bbox["xmax"] * w)
+        y1 = int(bbox["ymax"] * h)
+        for i in range(thickness):
+            draw.rectangle([x0 - i, y0 - i, x1 + i, y1 + i], outline=color)
+    return img
+
+
+def _download_n_per_concept(client, view_id, view_label, tag_ids, concept_map, view_dir, *, n=2, crop=False):
+    """TAG/CLA: fetch N images per concept tag."""
+    downloaded = 0
+    for tag_id in tag_ids:
+        concept_name = _dl_sanitize(concept_map.get(tag_id, str(tag_id)))
+        try:
+            regions = client.get_regions(view_id, page_size=n, tag=tag_id)
+        except Exception as exc:
+            logger.warning("  Could not fetch regions for %s / %s: %s", view_label, concept_name, exc)
+            continue
+        if not regions:
+            logger.info("  No image found for %s / %s", view_label, concept_name)
+            continue
+        for idx, region in enumerate(regions[:n], 1):
+            img_url = region.get("image", {}).get("original_signed_url")
+            if not img_url:
+                continue
+            bbox = region.get("region", {}).get("bbox") if crop else None
+            ext = _img_ext(region)
+            filepath = view_dir / f"{view_label}__{concept_name}__{idx}{ext}"
+            if bbox:
+                ok = _save_cropped_image(client, img_url, bbox, filepath)
+            else:
+                ok = _save_image(client, img_url, filepath)
+            if ok:
+                downloaded += 1
+    if downloaded == 0:
+        _download_fallback(client, view_id, view_label, view_dir, count=1)
+
+
+def _download_det_per_concept(client, view_id, view_label, tag_ids, concept_map, view_dir, *, n=2):
+    """DET: fetch N images per concept with bbox overlays."""
+    DET_BBOX_COLOR = (255, 107, 53)
+    downloaded = 0
+    for tag_id in tag_ids:
+        concept_name = _dl_sanitize(concept_map.get(tag_id, str(tag_id)))
+        try:
+            regions = client.get_regions(view_id, page_size=n, tag=tag_id)
+        except Exception as exc:
+            logger.warning("  Could not fetch regions for DET %s / %s: %s", view_label, concept_name, exc)
+            continue
+        if not regions:
+            continue
+        for idx, region in enumerate(regions[:n], 1):
+            img_url = region.get("image", {}).get("original_signed_url")
+            region_id = region.get("region", {}).get("id")
+            if not img_url or not region_id:
+                continue
+            filepath = view_dir / f"{view_label}__{concept_name}__{idx}.png"
+            if filepath.exists():
+                downloaded += 1
+                continue
+            try:
+                annotations = client.get_annotations(view_id, region_id)
+            except Exception:
+                _save_image(client, img_url, filepath)
+                downloaded += 1
+                continue
+            bboxes = []
+            for ann in annotations:
+                ann_tags = ann.get("tags", [])
+                tag_match = any(
+                    (t if isinstance(t, int) else t.get("id")) == tag_id
+                    for t in ann_tags
+                )
+                if tag_match:
+                    bbox = ann.get("region", {}).get("bbox")
+                    if bbox:
+                        bboxes.append(bbox)
+            try:
+                img_data = client.download_image(img_url)
+                img = PILImage.open(io.BytesIO(img_data))
+                if bboxes:
+                    img = _draw_bboxes(img, bboxes, color=DET_BBOX_COLOR, thickness=4)
+                img.save(filepath)
+                downloaded += 1
+            except Exception as exc:
+                logger.warning("  Failed to save DET image %s: %s", filepath.name, exc)
+    if downloaded == 0:
+        _download_fallback(client, view_id, view_label, view_dir, count=1)
+
+
+def _download_fallback(client, view_id, view_label, view_dir, count=1):
+    """Download generic sample images when no tag-specific strategy works."""
+    try:
+        regions = client.get_regions(view_id, page_size=count)
+    except Exception:
+        return
+    for i, region in enumerate(regions[:count]):
+        img_url = region.get("image", {}).get("original_signed_url")
+        if not img_url:
+            continue
+        ext = _img_ext(region)
+        filepath = view_dir / f"{view_label}__sample_{i + 1}{ext}"
+        _save_image(client, img_url, filepath)
+
+
+def download_sample_images(client, project_map: dict, images_dir: Path):
+    """Download sample images for each view, organised by view name.
+
+    Strategy per view kind:
+    - TAG / CLA: 2 images per concept.
+    - DET: 2 images per concept with bbox overlays.
+    """
+    images_dir.mkdir(parents=True, exist_ok=True)
+    concept_map = {c["id"]: c["concept_name"] for c in project_map.get("concepts", [])}
+
+    node_map = {n["id"]: n for n in project_map["nodes"]}
+    parent_kind: dict[str, str] = {}
+    for edge in project_map.get("edges", []):
+        src = node_map.get(edge["source"], {})
+        parent_kind[edge["target"]] = src.get("data", {}).get("kind", "").upper()
+
+    for node in project_map["nodes"]:
+        view_id = node["id"]
+        view_label = _dl_sanitize(node["label"])
+        kind = node["data"].get("kind", "").upper()
+        tag_ids: list[int] = node["data"].get("tag_ids", [])
+        is_child_of_det = parent_kind.get(view_id) == "DET"
+
+        view_dir = images_dir / view_label
+        view_dir.mkdir(parents=True, exist_ok=True)
+
+        if kind in ("TAG", "CLA"):
+            _download_n_per_concept(client, view_id, view_label, tag_ids,
+                                    concept_map, view_dir, n=2, crop=is_child_of_det)
+        elif kind == "DET":
+            _download_det_per_concept(client, view_id, view_label, tag_ids,
+                                      concept_map, view_dir, n=2)
+        else:
+            _download_fallback(client, view_id, view_label, view_dir, count=2)
+
+    logger.info("Images saved to %s", images_dir)
