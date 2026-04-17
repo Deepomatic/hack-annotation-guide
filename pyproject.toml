@@ -1,7 +1,7 @@
 [project]
 name = "hack-annotation-guide"
 version = "0.1.0"
-description = "Add your description here"
+description = "Generate annotation guide PowerPoint files from Deepomatic Studio projects"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
