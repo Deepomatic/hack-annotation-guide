@@ -85,6 +85,29 @@ class StudioClient:
         return self._get(f"{self.dataset_url}/views/map/")
 
     # ------------------------------------------------------------------
+    # Images (regions)
+    # ------------------------------------------------------------------
+
+    def get_regions(self, view_uuid: str, page_size: int = 10, tag: int | None = None) -> list[dict]:
+        """Fetch image regions for a view, optionally filtered by tag (concept ID)."""
+        params: dict[str, Any] = {"page_size": page_size}
+        if tag is not None:
+            params["tag"] = tag
+        data = self._get(f"{self.dataset_url}/views/{view_uuid}/regions/", params=params)
+        return data.get("results", data) if isinstance(data, dict) else data
+
+    def get_annotations(self, view_uuid: str, region_id: int) -> list[dict]:
+        """Fetch annotations for a specific region in a view."""
+        data = self._get(f"{self.dataset_url}/views/{view_uuid}/regions/{region_id}/annotations/")
+        return data.get("results", data) if isinstance(data, dict) else data
+
+    def download_image(self, url: str) -> bytes:
+        """Download an image from a signed URL."""
+        resp = self._client.get(url)
+        resp.raise_for_status()
+        return resp.content
+
+    # ------------------------------------------------------------------
     # Convenience
     # ------------------------------------------------------------------
 
