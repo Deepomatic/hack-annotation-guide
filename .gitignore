@@ -1,5 +1,11 @@
-.env
-.venv/
 *.pptx
 __pycache__/
-*.pyc
+*.py[cod]
+*.so
+.Python
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
