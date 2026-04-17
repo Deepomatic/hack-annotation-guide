@@ -335,7 +335,7 @@ def main(argv=None):
         _download_sample_images(client, project_map, images_dir)
 
     # Generate the PPTX
-    output = generate_pptx(project_map, args.output, images_dir=images_dir)
+    output = generate_pptx(project_map, args.output, images_dir=images_dir, org_slug=getattr(args, 'org', '') or '', project_slug=getattr(args, 'project', '') or '')
     print(f"✅ Done → {output}")
 
 

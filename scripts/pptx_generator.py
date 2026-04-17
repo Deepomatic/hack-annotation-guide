@@ -22,8 +22,9 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE, MSO_CONNECTOR_TYPE
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Cm, Pt
+from pptx.util import Cm, Emu, Pt
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,14 @@ def _sanitize(name: str) -> str:
 # ---------------------------------------------------------------------------
 # Slide-layout indices (default Office Theme)
 # ---------------------------------------------------------------------------
-LAYOUT_TITLE_SLIDE = 0
-LAYOUT_TITLE_CONTENT = 1
-LAYOUT_TITLE_ONLY = 2
-LAYOUT_BLANK = 5
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "template.pptx"
+
+# Layout indices in template/template.pptx (see the template's slide master)
+LAYOUT_COVER = 0          # "Title Only Slide"       — big centred title for cover page
+LAYOUT_SECTION = 5        # "Title + Subtitle slide" — section divider between views
+LAYOUT_CONTENT = 11       # "Title and Content"      — info slides with bullet content
+LAYOUT_COMPARISON = 6     # "Comparison"             — two-column content
+LAYOUT_IMAGES = 13        # "Title Only"             — concept image slides
 
 # Kind labels
 KIND_LABELS = {
@@ -58,6 +63,15 @@ COLOUR_PLACEHOLDER_BG = RGBColor(0xF2, 0xF2, 0xF2)  # light grey
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _clear_template_slides(prs):
+    """Drop any sample slides shipped with the template — we only want its masters/layouts."""
+    sld_id_lst = prs.slides._sldIdLst
+    rid_attr = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+    for sld_id in list(sld_id_lst):
+        prs.part.drop_rel(sld_id.get(rid_attr))
+        sld_id_lst.remove(sld_id)
 
 
 def _set_text(tf, text, bold=False, size_pt=14, colour=None, align=PP_ALIGN.LEFT):
@@ -312,43 +326,46 @@ def _slides_for_view(prs, node, nodes, concept_map, images_dir=None):
     slide_w = prs.slide_width
     slide_h = prs.slide_height
 
-    # --- Info slide (always) ---
-    layout = prs.slide_layouts[LAYOUT_TITLE_ONLY]
-    slide = prs.slides.add_slide(layout)
+    # --- Info slide (always): layout 11 "Title and Content" — fill the content placeholder ---
+    info_layout = prs.slide_layouts[LAYOUT_CONTENT]
+    slide = prs.slides.add_slide(info_layout)
 
-    title = slide.shapes.title
-    title.text = f"{node['label']}  –  {kind_label}"
-    title.text_frame.paragraphs[0].runs[0].font.color.rgb = COLOUR_TITLE
-    title.text_frame.paragraphs[0].runs[0].font.size = Pt(24)
+    slide.shapes.title.text = f"{node['label']}  –  {kind_label}"
 
-    info_left = Cm(0.5)
-    info_top = Cm(3.5)
-    info_w = Cm(11)
-
-    lines = []
     parent_label = ""
     if node["parent"] and node["parent"] in nodes:
         parent_label = nodes[node["parent"]]["label"]
-    lines.append(("Parent view:", parent_label or "— (root)"))
-
     cond_str = _resolve_conditions(node["conditions"], concept_map)
-    lines.append(("Activated by:", cond_str or "—"))
-
     child_labels = [nodes[c]["label"] for c in node["children"] if c in nodes]
-    lines.append(("Child views:", ", ".join(child_labels) if child_labels else "—"))
-
     tag_names = node.get("tag_names", [])
+
+    lines = [
+        ("Parent view", parent_label or "— (root)"),
+        ("Activated by", cond_str or "—"),
+        ("Child views", ", ".join(child_labels) if child_labels else "—"),
+    ]
     if tag_names:
-        lines.append(("Concepts:", ", ".join(tag_names)))
+        lines.append(("Concepts", ", ".join(tag_names)))
 
-    y_offset = info_top
-    row_h = Cm(1.1)
-    for label, value in lines:
-        _add_text_box(slide, info_left, y_offset, info_w, row_h, label, bold=True, size_pt=11, colour=COLOUR_TITLE)
-        _add_text_box(slide, info_left, y_offset + Cm(0.55), info_w, row_h, value or "—", bold=False, size_pt=11)
-        y_offset += Cm(1.7)
+    content_ph = slide.placeholders[1]  # "Content Placeholder 2"
+    tf = content_ph.text_frame
+    tf.word_wrap = True
+    tf.clear()
+    for i, (label, value) in enumerate(lines):
+        # Label line at level 0 (inherits template bullet style)
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        para.level = 0
+        label_run = para.add_run()
+        label_run.text = label
+        label_run.font.bold = True
+        # Value line at level 1 (indented, template sub-bullet style)
+        val_para = tf.add_paragraph()
+        val_para.level = 1
+        val_run = val_para.add_run()
+        val_run.text = value
 
-    # --- Concept slides (max 3 per slide) ---
+    # --- Concept slides (max 3 per slide): layout 13 "Title Only" ---
+    concept_layout = prs.slide_layouts[LAYOUT_IMAGES]
     view_images = _find_view_images(node["label"], images_dir)
 
     # Build the list of concepts to show
@@ -366,24 +383,23 @@ def _slides_for_view(prs, node, nodes, concept_map, images_dir=None):
     CONCEPTS_PER_SLIDE = 3
     chunks = [concepts[i:i + CONCEPTS_PER_SLIDE] for i in range(0, len(concepts), CONCEPTS_PER_SLIDE)]
 
-    content_top = Cm(3.5)
-    content_h = slide_h - content_top - Cm(1)
-    margin = Cm(0.5)
+    # Content zone matches layout 11's content placeholder so info + concept slides align.
+    content_left = Cm(3.6)
+    content_top = Cm(5.0)
+    content_w = Cm(28.0)
+    content_h = slide_h - content_top - Cm(1.5)
 
     for chunk_idx, chunk in enumerate(chunks):
-        slide = prs.slides.add_slide(layout)
+        slide = prs.slides.add_slide(concept_layout)
 
         title = slide.shapes.title
         if len(chunks) > 1:
             title.text = f"{node['label']}  ({chunk_idx + 1}/{len(chunks)})"
         else:
             title.text = node["label"]
-        title.text_frame.paragraphs[0].runs[0].font.color.rgb = COLOUR_TITLE
-        title.text_frame.paragraphs[0].runs[0].font.size = Pt(22)
 
         n_cols = len(chunk)
-        total_content_w = slide_w - 2 * margin
-        col_w = total_content_w // n_cols
+        col_w = content_w // n_cols
 
         for col_idx, concept_name in enumerate(chunk):
             # Try to find the image — match by concept name
@@ -403,7 +419,7 @@ def _slides_for_view(prs, node, nodes, concept_map, images_dir=None):
                         img_path = v
                         break
 
-            x = margin + col_idx * col_w
+            x = content_left + col_idx * col_w
             _add_concept_to_slide(
                 slide, concept_name, img_path,
                 x, content_top, col_w, content_h,
@@ -411,49 +427,172 @@ def _slides_for_view(prs, node, nodes, concept_map, images_dir=None):
             )
 
 
-def _slide_intro(prs, nodes, roots, concept_map):
-    """Title / introduction slide listing all views."""
-    layout = prs.slide_layouts[LAYOUT_TITLE_SLIDE]
-    slide = prs.slides.add_slide(layout)
+def _slide_intro(prs, nodes, roots, concept_map, *, org_slug="", project_slug=""):
+    """Cover slide + tree diagram overview slide."""
+    # --- Cover slide (Layout 0 — big centred title) ---
+    cover = prs.slides.add_slide(prs.slide_layouts[LAYOUT_COVER])
+    title_parts = ["Annotation Guide"]
+    if org_slug or project_slug:
+        title_parts.append(" · ")
+        title_parts.append(" - ".join(filter(None, [org_slug.upper(), project_slug.upper()])))
+    cover.shapes.title.text = "".join(title_parts)
 
-    title = slide.shapes.title
-    title.text = "Annotation Guide"
-    title.text_frame.paragraphs[0].runs[0].font.color.rgb = COLOUR_TITLE
+    # --- Tree diagram slide ---
+    _slide_tree_overview(prs, nodes, roots, concept_map)
 
-    subtitle = slide.placeholders[1]
-    tf = subtitle.text_frame
-    tf.clear()
 
-    def add_line(text, indent=0, bold=False, size_pt=12, colour=None):
-        para = tf.add_paragraph()
-        para.level = indent
-        run = para.add_run()
-        run.text = text
-        run.font.size = Pt(size_pt)
-        run.font.bold = bold
-        if colour:
-            run.font.color.rgb = colour
+# ---------------------------------------------------------------------------
+# Tree diagram
+# ---------------------------------------------------------------------------
 
-    # First paragraph
-    tf.paragraphs[0].clear()
-    first_run = tf.paragraphs[0].add_run()
-    first_run.text = "Views overview:"
-    first_run.font.bold = True
-    first_run.font.size = Pt(13)
-    first_run.font.color.rgb = COLOUR_TITLE
+def _compute_tree_positions(nodes, roots):
+    """Return dict {nid: (grid_x, grid_y)} and (total_width, num_levels)."""
+    widths: dict[str, float] = {}
 
-    ordered = _dfs_order(nodes, roots)
-    for nid in ordered:
+    def calc_width(nid):
+        children = [c for c in nodes[nid]["children"] if c in nodes]
+        if not children:
+            widths[nid] = 1.0
+        else:
+            widths[nid] = sum(calc_width(c) for c in children)
+        return widths[nid]
+
+    total_w = sum(calc_width(r) for r in roots)
+
+    positions: dict[str, tuple[float, int]] = {}
+    max_depth = 0
+
+    def assign(nid, x_start, depth):
+        nonlocal max_depth
+        max_depth = max(max_depth, depth)
+        w = widths[nid]
+        positions[nid] = (x_start + w / 2.0, depth)
+        children = [c for c in nodes[nid]["children"] if c in nodes]
+        cx = x_start
+        for c in children:
+            assign(c, cx, depth + 1)
+            cx += widths[c]
+
+    x = 0.0
+    for r in roots:
+        assign(r, x, 0)
+        x += widths[r]
+
+    return positions, total_w, max_depth + 1
+
+
+def _slide_tree_overview(prs, nodes, roots, concept_map):
+    """Draw a tree diagram of the view hierarchy on a slide."""
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_IMAGES])
+    slide.shapes.title.text = "Views Overview"
+
+    slide_w = prs.slide_width
+    slide_h = prs.slide_height
+
+    positions, total_w, num_levels = _compute_tree_positions(nodes, roots)
+    if not positions:
+        return slide
+
+    # Drawing area (below title)
+    area_left = Cm(1.5)
+    area_top = Cm(2.2)
+    area_w = slide_w - Cm(3.0)
+    area_h = slide_h - area_top - Cm(0.8)
+
+    # Node box dimensions – scale to fit
+    node_w = min(Cm(3.2), int(area_w / max(total_w, 1) - Cm(0.4)))
+    node_w = max(node_w, Cm(1.8))
+    node_h = Cm(1.0)
+
+    # Grid cell sizes
+    cell_w = area_w / total_w if total_w else area_w
+    cell_h = area_h / num_levels if num_levels > 1 else area_h
+
+    # Convert grid → EMU positions (centre of each node box)
+    emu_pos: dict[str, tuple[int, int]] = {}
+    for nid, (gx, gy) in positions.items():
+        cx = int(area_left + gx * cell_w)
+        cy = int(area_top + gy * cell_h + node_h // 2)
+        emu_pos[nid] = (cx, cy)
+
+    # --- Draw connectors (edges) ---
+    connector_colour = RGBColor(0xAA, 0xAA, 0xAA)
+    cond_label_colour = RGBColor(0x55, 0x55, 0x55)
+
+    for nid in positions:
+        children = [c for c in nodes[nid]["children"] if c in nodes]
+        if not children:
+            continue
+        px, py = emu_pos[nid]
+        parent_bottom_y = py + node_h // 2
+
+        for child_id in children:
+            cx, cy = emu_pos[child_id]
+            child_top_y = cy - node_h // 2
+
+            # Straight line from parent bottom-centre → child top-centre
+            conn = slide.shapes.add_connector(
+                MSO_CONNECTOR_TYPE.STRAIGHT,
+                px, parent_bottom_y, cx, child_top_y,
+            )
+            conn.line.color.rgb = connector_colour
+            conn.line.width = Pt(1.0)
+
+            # Condition label at midpoint of the edge
+            cond_text = _resolve_conditions(nodes[child_id]["conditions"], concept_map)
+            if cond_text:
+                mid_x = (px + cx) // 2
+                mid_y = (parent_bottom_y + child_top_y) // 2
+                lbl_w = min(Cm(4.0), int(cell_w * 0.95))
+                lbl_h = Cm(0.9)
+                tb = slide.shapes.add_textbox(
+                    mid_x - lbl_w // 2, mid_y - lbl_h // 2, lbl_w, lbl_h,
+                )
+                tf = tb.text_frame
+                tf.word_wrap = True
+                para = tf.paragraphs[0]
+                para.alignment = PP_ALIGN.CENTER
+                run = para.add_run()
+                run.text = f"({cond_text})"
+                run.font.size = Pt(6)
+                run.font.color.rgb = cond_label_colour
+
+    # --- Draw node boxes ---
+    for nid, (cx, cy) in emu_pos.items():
         n = nodes[nid]
-        depth = 0
-        pid = n["parent"]
-        while pid and pid in nodes:
-            depth += 1
-            pid = nodes[pid]["parent"]
-        kind = KIND_LABELS.get(n["kind"], n["kind"])
-        prefix = "  " * depth + ("└ " if depth else "• ")
-        add_line(f"{prefix}{n['label']}  [{kind}]", indent=min(depth, 4), size_pt=11)
+        colour = _kind_colour(n["kind"])
 
+        shape = slide.shapes.add_shape(
+            MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
+            cx - node_w // 2, cy - node_h // 2, node_w, node_h,
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        shape.line.color.rgb = colour
+        shape.line.width = Pt(2)
+
+        tf = shape.text_frame
+        tf.word_wrap = True
+        para = tf.paragraphs[0]
+        para.alignment = PP_ALIGN.CENTER
+        run = para.add_run()
+        run.text = n["label"]
+        run.font.size = Pt(8)
+        run.font.bold = True
+
+    return slide
+
+
+def _slide_section(prs, node):
+    """Add a section divider slide (Layout 5) for a top-level view."""
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_SECTION])
+    slide.shapes.title.text = node["label"]
+    kind_label = KIND_LABELS.get(node["kind"], node["kind"])
+    # Layout 5: placeholder 0 = title (bottom), placeholder 1 = subtitle (above)
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx == 1:
+            ph.text = kind_label
+            break
     return slide
 
 
@@ -465,7 +604,7 @@ def _slide_intro(prs, nodes, roots, concept_map):
 # ---------------------------------------------------------------------------
 
 
-def generate_pptx(project_map: dict, output_path: str | Path, *, images_dir: Path | None = None) -> Path:
+def generate_pptx(project_map: dict, output_path: str | Path, *, images_dir: Path | None = None, org_slug: str = "", project_slug: str = "") -> Path:
     """
     Build the annotation guide .pptx from a project map and write it.
 
@@ -477,19 +616,27 @@ def generate_pptx(project_map: dict, output_path: str | Path, *, images_dir: Pat
         Destination file path.
     images_dir : Path | None
         Directory containing downloaded sample images (one sub-folder per view).
+    org_slug : str
+        Organisation slug (shown on the cover slide).
+    project_slug : str
+        Project slug (shown on the cover slide).
     """
     nodes, roots = _build_tree(project_map)
     concept_map = _build_concept_map(project_map)
     ordered = _dfs_order(nodes, roots)
 
-    prs = Presentation()
-    prs.slide_width = Cm(33.87)
-    prs.slide_height = Cm(19.05)
+    prs = Presentation(str(TEMPLATE_PATH))
+    _clear_template_slides(prs)
+    logger.info("Using template at %s", TEMPLATE_PATH)
 
-    _slide_intro(prs, nodes, roots, concept_map)
+    _slide_intro(prs, nodes, roots, concept_map, org_slug=org_slug, project_slug=project_slug)
 
     for nid in ordered:
-        _slides_for_view(prs, nodes[nid], nodes, concept_map, images_dir=images_dir)
+        node = nodes[nid]
+        # Section divider for root-level views (no parent)
+        if not node["parent"] or node["parent"] not in nodes:
+            _slide_section(prs, node)
+        _slides_for_view(prs, node, nodes, concept_map, images_dir=images_dir)
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
