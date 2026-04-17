@@ -1,6 +1,6 @@
 # Annotation Guide Generator
 
-Generate a skeleton `.pptx` annotation guide from a Deepomatic Studio project.
+Generate a `.pptx` annotation guide from a Deepomatic Studio project.
 
 Connects to the Studio API, fetches the project's view tree (views, concepts, conditions), downloads sample images from Studio annotations, and produces a PowerPoint presentation.
 
@@ -8,20 +8,28 @@ Connects to the Studio API, fetches the project's view tree (views, concepts, co
 
 The output `.pptx` contains:
 
-1. **Intro slide** — an overview of the full view hierarchy (all views listed with their type)
-2. **Info slide per view** — showing parent view, activation conditions, child views, and the full list of concepts
-3. **Concept slides per view** — up to 3 concepts per slide, with:
-   - A **sample image** for each concept, fetched directly from the project's Studio annotations
-   - The **concept name** displayed as a legend below each image
-   - If a concept has no annotated image yet, the space is left blank with a "missing image" placeholder and the concept name still shown
+1. **Cover slide** — project name with gradient background and accent bars
+2. **Table of Contents** — lists all root views with kind badges (Detection / Classification / Tagging)
+3. **Views Overview** — tree diagram of the full view hierarchy
+4. **Per-view slides**:
+   - **Section divider** (for root views) — navy gradient with kind badge
+   - **Info slide** — key-value metadata card (parent, activation conditions, children, concepts)
+   - **Concept recap** — grid overview of all concepts in the view with sample images
+   - **Concept detail** — split slide with good examples (left) and bad examples (right) per concept
 
-For views that are children of a **detection** view, the images are **cropped to the detection bounding box** from the parent view, so you see only the detected region.
+View types are color-coded: **Detection** (orange), **Classification** (teal), **Tagging** (sky blue).
 
-Image download strategy:
-- **Tagging / Classification views**: 1 image per concept, filtered by tag
-- **Detection views**: 1 image that covers as many concepts as possible
+For views that are children of a **detection** view, sample images are **cropped to the detection bounding box**.
 
-If a view has more than 3 concepts (e.g. 9), it will span multiple slides (3 slides of 3 concepts each). The slide title always shows the view name.
+## Project structure
+
+```
+scripts/
+├── main.py                 # CLI entry point (arg parsing, image download, orchestration)
+├── build_pptx_slides.py    # Slide composition recipe (what slides, in what order)
+├── pptx_helper.py          # PPTX primitives, layout constants, colors, slide builders
+└── studio_api.py           # Studio REST API client
+```
 
 ## Setup
 
@@ -36,8 +44,9 @@ echo 'DEEPOMATIC_API_KEY=your_key_here' > .env
 ## Usage
 
 ```bash
-source .env && export DEEPOMATIC_API_KEY
-uv run python scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
+cd scripts/
+source ../.env && export DEEPOMATIC_API_KEY
+uv run python main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 ```
 
 ### Options
@@ -45,20 +54,35 @@ uv run python scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--org` | Studio organisation slug | required* |
-| `--project` | Studio project slug | required* |
+| `--project` | Studio project slug | required with `--org` |
+| `--map` | Path to local project map JSON (alternative to `--org`/`--project`) | — |
 | `--cluster` | Studio cluster: `eu` or `us` | `eu` |
-| `--map` | Path to local project map JSON (alternative to --org/--project) | — |
 | `--output` | Output `.pptx` file path | `annotation_guide.pptx` |
+| `--token` | Studio Bearer token (or set `DEEPOMATIC_TOKEN` env var) | — |
+| `--api-key` | Studio API key (or set `DEEPOMATIC_API_KEY` env var) | — |
 
-### Example
+\* Either `--org` + `--project` or `--map` is required.
+
+### Examples
 
 ```bash
-source .env && export DEEPOMATIC_API_KEY
-uv run python scripts/main.py --org sandbox --project hackatono
+# Default guide
+uv run python main.py --org sandbox --project hackatono
+
+# Custom output path
+uv run python main.py --org sandbox --project hackatono --output /tmp/guide.pptx
+
+# US cluster
+uv run python main.py --org sandbox --project hackatono --cluster us
+
+# From a local map JSON
+uv run python main.py --map project_map.json
 ```
 
 ## Skill integration
 
-This project works as a skill for both **GitHub Copilot** (via `.github/copilot-instructions.md`) and **Claude Code** (via `SKILL.md`).
+This project works as an AI coding assistant skill (via `SKILL.md`).
 
 Trigger phrase: *"Create an annotation guide for the X org and the Y project"*
+
+The skill supports customisation (colors, slides, extra images) and iterative refinement.
