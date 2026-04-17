@@ -62,6 +62,12 @@ def _parse_args(argv=None):
         help="Studio API key (or set DEEPOMATIC_API_KEY env var).",
     )
     parser.add_argument(
+        "--cluster",
+        default="eu",
+        choices=["eu", "us"],
+        help="Studio cluster: 'eu' (default) or 'us' (studio.us1.deepomatic.com).",
+    )
+    parser.add_argument(
         "--output",
         default="annotation_guide.pptx",
         metavar="OUTPUT_PPTX",
@@ -95,6 +101,7 @@ def main(argv=None):
             project_slug=args.project,
             token=args.token,
             api_key=args.api_key,
+            cluster=args.cluster,
         )
         project_map = client.fetch_project_map()
 

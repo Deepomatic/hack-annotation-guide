@@ -13,17 +13,22 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-STUDIO_BASE_URL = "https://studio.deepomatic.com/api"
+STUDIO_URLS = {
+    "eu": "https://studio.deepomatic.com/api",
+    "us": "https://studio.us1.deepomatic.com/api",
+}
 
 
 class StudioClient:
     """Thin wrapper around Studio REST endpoints."""
 
-    def __init__(self, org_slug: str, project_slug: str, token: str | None = None, api_key: str | None = None):
+    def __init__(self, org_slug: str, project_slug: str, token: str | None = None, api_key: str | None = None, cluster: str = "eu"):
         self.org_slug = org_slug
         self.project_slug = project_slug
-        self.base_url = f"{STUDIO_BASE_URL}/orgs/{org_slug}"
+        base_api = STUDIO_URLS.get(cluster, STUDIO_URLS["eu"])
+        self.base_url = f"{base_api}/orgs/{org_slug}"
         self.dataset_url = f"{self.base_url}/datasets/{project_slug}"
+        logger.info("Using %s cluster: %s", cluster.upper(), base_api)
 
         # Auth – prefer token, fall back to api_key, then env vars
         token = token or os.getenv("DEEPOMATIC_TOKEN")

@@ -26,6 +26,7 @@ uv run python scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG> --output
 ### Parameters
 - `--org` (required): Studio organisation slug (e.g. `sandbox`)
 - `--project` (required): Studio project slug (e.g. `hackatono`)
+- `--cluster` (optional): Studio cluster — `eu` (default) or `us` (for US projects on studio.us1.deepomatic.com)
 - `--output` (optional): Output file path (default: `annotation_guide.pptx`)
 - `--map` (alternative to --org/--project): Path to a local project map JSON file
 

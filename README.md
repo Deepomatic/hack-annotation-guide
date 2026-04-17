@@ -29,6 +29,7 @@ uv run python scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 |------|-------------|---------|
 | `--org` | Studio organisation slug | required* |
 | `--project` | Studio project slug | required* |
+| `--cluster` | Studio cluster: `eu` or `us` | `eu` |
 | `--map` | Path to local project map JSON (alternative to --org/--project) | — |
 | `--output` | Output `.pptx` file path | `annotation_guide.pptx` |
 
