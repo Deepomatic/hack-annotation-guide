@@ -1,7 +1,5 @@
+.env
 .venv/
+*.pptx
 __pycache__/
 *.pyc
-*.pptx
-*.jpg
-*.jpeg
-*.png
