@@ -2,9 +2,26 @@
 
 Generate a skeleton `.pptx` annotation guide from a Deepomatic Studio project.
 
-Connects to the Studio API, fetches the project's view tree (views, concepts, conditions), and produces a PowerPoint with:
-- An **intro slide** showing the full view hierarchy
-- **One slide per view** with parent, conditions, child views, all concepts, and a color-coded image placeholder (Detection=orange, Classification=green, Tagging=blue)
+Connects to the Studio API, fetches the project's view tree (views, concepts, conditions), downloads sample images from Studio annotations, and produces a PowerPoint presentation.
+
+## What it generates
+
+The output `.pptx` contains:
+
+1. **Intro slide** — an overview of the full view hierarchy (all views listed with their type)
+2. **Info slide per view** — showing parent view, activation conditions, child views, and the full list of concepts
+3. **Concept slides per view** — up to 3 concepts per slide, with:
+   - A **sample image** for each concept, fetched directly from the project's Studio annotations
+   - The **concept name** displayed as a legend below each image
+   - If a concept has no annotated image yet, the space is left blank with a "missing image" placeholder and the concept name still shown
+
+For views that are children of a **detection** view, the images are **cropped to the detection bounding box** from the parent view, so you see only the detected region.
+
+Image download strategy:
+- **Tagging / Classification views**: 1 image per concept, filtered by tag
+- **Detection views**: 1 image that covers as many concepts as possible
+
+If a view has more than 3 concepts (e.g. 9), it will span multiple slides (3 slides of 3 concepts each). The slide title always shows the view name.
 
 ## Setup
 
