@@ -26,13 +26,14 @@ Creates and customises `.pptx` annotation guides from Deepomatic Studio projects
 
 ### Step 0 — Copy the scripts folder
 
-**Every time** the user asks to create or modify an annotation guide, start by copying the **entire** `scripts/` folder into `scripts/generated/`:
+**Every time** the user asks to create or modify an annotation guide, start by copying the scripts into `scripts/generated/`:
 
 ```bash
-cp -r /home/emma/Documents/skills/hack-annotation-guide/scripts/ /home/emma/Documents/skills/hack-annotation-guide/scripts/generated/custom_scripts/
+mkdir -p scripts/generated
+cp scripts/*.py scripts/generated/
 ```
 
-All subsequent edits happen **only inside `scripts/generated/custom_scripts/`**. The original `scripts/` folder is never modified.
+All subsequent edits happen **only inside `scripts/generated/`**. The original `scripts/` folder is never modified.
 
 ### Step 1 — Make changes (prefer minimal edits)
 
@@ -45,22 +46,20 @@ Apply changes in this order of preference:
 
 ### Step 2 — Run the generation
 
+Always run from the **project root** (where `pyproject.toml` lives). All paths below are relative to the project root. Use `uv run` with `--env-file` to load credentials automatically — no manual venv activation needed:
+
 ```bash
-cd /home/emma/Documents/skills/hack-annotation-guide/scripts/generated/custom_scripts
-source /home/emma/Documents/skills/hack-annotation-guide/.env && export DEEPOMATIC_API_KEY
-uv run python main.py --org <ORG_SLUG> --project <PROJECT_SLUG> --output <OUTPUT_PATH>
+uv run --env-file .env scripts/generated/main.py --org <ORG_SLUG> --project <PROJECT_SLUG> --output <OUTPUT_PATH>
 ```
 
 ### Step 3 — Iterate
 
-If the user wants changes, edit the files in `scripts/generated/custom_scripts/` and re-run. Don't re-copy from `scripts/` unless the user asks to start over.
+If the user wants changes, edit the files in `scripts/generated/` and re-run. Don't re-copy from `scripts/` unless the user asks to start over.
 
 ## Default CLI usage
 
 ```bash
-cd /home/emma/Documents/skills/hack-annotation-guide/scripts
-source ../.env && export DEEPOMATIC_API_KEY
-uv run python main.py --org <ORG_SLUG> --project <PROJECT_SLUG> --output <OUTPUT_PATH>
+uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG> --output <OUTPUT_PATH>
 ```
 
 ### Parameters
@@ -98,17 +97,15 @@ All slide builders accept keyword color overrides (e.g. `bg_color=`, `accent_col
 
 Generate default guide:
 ```bash
-cd /home/emma/Documents/skills/hack-annotation-guide/scripts
-source ../.env && export DEEPOMATIC_API_KEY
-uv run python main.py --org sandbox --project hackatono
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono
 ```
 
 Generate for US cluster:
 ```bash
-uv run python main.py --org sandbox --project hackatono --cluster us
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono --cluster us
 ```
 
 Generate from a local map file:
 ```bash
-uv run python main.py --map project_map.json --output my_guide.pptx
+uv run --env-file .env scripts/main.py --map project_map.json --output my_guide.pptx
 ```

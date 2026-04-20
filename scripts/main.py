@@ -82,10 +82,10 @@ def _download_sample_images(client: StudioClient, project_map: dict, images_dir:
 
         if kind in ("TAG", "CLA"):
             _download_n_per_concept(client, view_id, view_label, tag_ids,
-                                    concept_map, view_dir, n=2, crop=is_child_of_det)
+                                    concept_map, view_dir, n=4, crop=is_child_of_det)
         elif kind == "DET":
             _download_det_per_concept(client, view_id, view_label, tag_ids,
-                                      concept_map, view_dir, n=2)
+                                      concept_map, view_dir, n=4)
         else:
             # Unknown kind – just grab one sample
             _download_fallback(client, view_id, view_label, view_dir, count=2)

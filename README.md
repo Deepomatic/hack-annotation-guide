@@ -43,10 +43,10 @@ echo 'DEEPOMATIC_API_KEY=your_key_here' > .env
 
 ## Usage
 
+All commands are run from the project root:
+
 ```bash
-cd scripts/
-source ../.env && export DEEPOMATIC_API_KEY
-uv run python main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
+uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 ```
 
 ### Options
@@ -67,16 +67,16 @@ uv run python main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 
 ```bash
 # Default guide
-uv run python main.py --org sandbox --project hackatono
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono
 
 # Custom output path
-uv run python main.py --org sandbox --project hackatono --output /tmp/guide.pptx
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono --output /tmp/guide.pptx
 
 # US cluster
-uv run python main.py --org sandbox --project hackatono --cluster us
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono --cluster us
 
 # From a local map JSON
-uv run python main.py --map project_map.json
+uv run --env-file .env scripts/main.py --map project_map.json
 ```
 
 ## Skill integration

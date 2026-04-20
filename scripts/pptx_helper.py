@@ -1262,6 +1262,27 @@ def build_concept_recap_slide(
     return slide
 
 
+def _generate_concept_explanation(concept_name: str) -> str:
+    """Generate a short French explanation for a concept based on its name."""
+    name = concept_name.lower().strip()
+    # Common concept patterns
+    explanations = {
+        "ok": "État normal et conforme, aucun défaut détecté.",
+        "ko": "État non conforme, présence d'un défaut.",
+        "present": "L'élément recherché est bien visible sur l'image.",
+        "absent": "L'élément recherché est manquant sur l'image.",
+        "open": "L'élément est en position ouverte.",
+        "closed": "L'élément est en position fermée.",
+        "damaged": "L'élément présente des dommages visibles.",
+        "clean": "Surface propre, sans saleté ni obstruction.",
+        "dirty": "Surface sale ou obstruée par des débris.",
+    }
+    if name in explanations:
+        return explanations[name]
+    # Default: describe what to annotate
+    return f"Annotez lorsque '{concept_name}' est identifié."
+
+
 def build_concept_detail_slide(
     prs,
     node: dict,
@@ -1271,28 +1292,25 @@ def build_concept_detail_slide(
     accent_color: RGBColor = None,
     bg_color: RGBColor = None,
     good_color: RGBColor = None,
-    bad_color: RGBColor = None,
-    good_label: str = "✓  Good Examples",
-    bad_label: str = "✗  Bad Examples",
+    examples_label: str = "✓  Exemples",
     good_images: list | None = None,
-    bad_images: list | None = None,
-    n_slots: int = 2,
+    n_good: int = 4,
+    explanation: str | None = None,
 ):
-    """Per-concept split slide: good examples (left) / bad examples (right).
+    """Per-concept slide: 2×2 grid of example images + explanation text.
 
     Args:
         concept_name: Concept being illustrated.
         accent_color: Top-line accent (default per-kind).
-        good_color/bad_color: Left/right panel stripes.
-        good_label/bad_label: Section headers.
-        good_images: Explicit list of Path for good side (overrides auto-match).
-        bad_images: Explicit list of Path for bad side.
-        n_slots: Number of image slots per side (stacked vertically).
+        good_color: Panel stripe color.
+        examples_label: Section header.
+        good_images: Explicit list of Path for examples (overrides auto-match).
+        n_good: Number of image slots (default 4, arranged in 2×2).
+        explanation: Short French explanation text (auto-generated if None).
     """
     bg = bg_color or LIGHT_BG
     accent = accent_color or kind_color(node["kind"])
     gc = good_color or GREEN
-    bc = bad_color or RED
 
     slide = add_blank_slide(prs)
     set_slide_bg_solid(slide, bg)
@@ -1304,51 +1322,58 @@ def build_concept_detail_slide(
                 font_size=FONT_SIZE_CAPTION, color=MUTED, alignment=PP_ALIGN.RIGHT)
     add_top_line(slide, color=accent)
 
-    half_w = (int(CONTENT_WIDTH) - int(Cm(1.0))) // 2
-    left_x = int(MARGIN_LEFT)
-    right_x = int(MARGIN_LEFT) + half_w + int(Cm(1.0))
+    panel_x = int(MARGIN_LEFT)
+    panel_w = int(CONTENT_WIDTH)
     area_top = int(CONTENT_TOP) + int(Cm(0.3))
-    area_h = int(SLIDE_HEIGHT) - area_top - int(Cm(1.5))
+    explanation_h = int(Cm(1.8))
+    area_h = int(SLIDE_HEIGHT) - area_top - int(Cm(1.5)) - explanation_h
     pad = int(Cm(0.5))
 
     # Resolve images
     if good_images is None:
         view_images = find_view_images(node["label"], images_dir)
         good_images = match_images(concept_name, view_images)
-    if bad_images is None:
-        bad_images = []
 
-    def _draw_panel(panel_x, panel_color, label_text, images):
-        add_card(slide, panel_x, area_top, half_w, area_h,
-                 fill_color=WHITE, border_color=DIVIDER, shadow=True)
-        add_accent_bar(slide, panel_x, area_top, half_w, Cm(0.15), panel_color)
-        add_textbox(slide, panel_x + Cm(0.5), area_top + Cm(0.3),
-                    half_w - Cm(1), Cm(1.0), label_text,
-                    font_size=FONT_SIZE_BODY, bold=True, color=panel_color)
+    # Card with examples
+    add_card(slide, panel_x, area_top, panel_w, area_h,
+             fill_color=WHITE, border_color=DIVIDER, shadow=True)
+    add_accent_bar(slide, panel_x, area_top, panel_w, Cm(0.15), gc)
+    add_textbox(slide, panel_x + Cm(0.5), area_top + Cm(0.3),
+                panel_w - Cm(1), Cm(1.0), examples_label,
+                font_size=FONT_SIZE_BODY, bold=True, color=gc)
 
-        slot_top = area_top + Cm(1.6)
-        slot_gap = int(Cm(0.3))
-        slot_h = (area_h - Cm(2.0) - slot_gap * (n_slots - 1)) // n_slots
-        slot_w = half_w - 2 * pad
+    # 2×2 grid of images
+    slot_top = area_top + int(Cm(1.6))
+    cols, rows = 2, 2
+    gap = int(Cm(0.3))
+    usable_w = panel_w - 2 * pad
+    usable_h = area_h - int(Cm(2.0))
+    slot_w = (usable_w - gap * (cols - 1)) // cols
+    slot_h = (usable_h - gap * (rows - 1)) // rows
 
-        for i in range(n_slots):
-            sx = panel_x + pad
-            sy = slot_top + i * (int(slot_h) + slot_gap)
+    for i in range(n_good):
+        col = i % cols
+        row = i // cols
+        sx = panel_x + pad + col * (slot_w + gap)
+        sy = slot_top + row * (slot_h + gap)
 
-            if i < len(images) and images[i].exists():
-                add_image(slide, images[i], sx, sy, slot_w, slot_h)
-            else:
-                placeholder_lbl = f"[ {label_text.split()[-1].lower()} ]"
-                add_image_placeholder(slide, sx, sy, slot_w, slot_h,
-                                      label=placeholder_lbl, border_color=panel_color,
-                                      bg_color=PLACEHOLDER_BG)
+        if i < len(good_images) and good_images[i].exists():
+            add_image(slide, good_images[i], sx, sy, slot_w, slot_h)
+        else:
+            add_image_placeholder(slide, sx, sy, slot_w, slot_h,
+                                  label="[ exemple ]", border_color=gc,
+                                  bg_color=PLACEHOLDER_BG)
 
-    _draw_panel(left_x, gc, good_label, good_images)
-
-    divider_x = left_x + half_w + int(Cm(0.5))
-    add_vertical_divider(slide, divider_x, area_top, area_h, color=DIVIDER)
-
-    _draw_panel(right_x, bc, bad_label, bad_images)
+    # Explanation text box at bottom
+    expl_text = explanation or _generate_concept_explanation(concept_name)
+    expl_top = area_top + area_h + int(Cm(0.3))
+    add_card(slide, panel_x, expl_top, panel_w, explanation_h,
+             fill_color=WHITE, border_color=DIVIDER, shadow=False)
+    add_accent_bar(slide, panel_x, expl_top, panel_w, Cm(0.1), accent)
+    add_textbox(slide, panel_x + Cm(0.8), expl_top + Cm(0.2),
+                panel_w - Cm(1.6), explanation_h - Cm(0.4), expl_text,
+                font_size=FONT_SIZE_BODY, italic=True, color=DARK_TEXT,
+                alignment=PP_ALIGN.CENTER)
 
     add_bottom_strip(slide, accent)
     return slide

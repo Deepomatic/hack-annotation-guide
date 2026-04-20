@@ -25,13 +25,13 @@ def build_all_slides(
     org_slug: str = "",
     project_slug: str = "",
 ):
-    """Build the complete annotation guide slide deck.
+    """Build the complete annotation guide slide deck (French).
 
     Per-view structure:
       1. Section divider (root views only)
       2. Info slide (metadata)
       3. Concept recap (grid overview of all concepts)
-      4. Per-concept detail slides (good/bad split)
+      4. Per-concept detail slides (4 good examples, no bad examples, with explanation)
     """
     nodes, roots = build_tree(project_map)
     concept_map = build_concept_map(project_map)
@@ -39,13 +39,13 @@ def build_all_slides(
 
     # ── Cover ──
     project_name = " — ".join(filter(None, [org_slug.upper(), project_slug.upper()]))
-    build_cover_slide(prs, project_name=project_name)
+    build_cover_slide(prs, project_name=project_name, title="Guide d'Annotation")
 
     # ── Table of Contents ──
-    build_toc_slide(prs, nodes, roots)
+    build_toc_slide(prs, nodes, roots, title="Table des Matières")
 
     # ── Views Overview (tree diagram) ──
-    build_overview_slide(prs, nodes, roots, concept_map)
+    build_overview_slide(prs, nodes, roots, concept_map, title="Vue d'Ensemble")
 
     # ── Per-view slides ──
     for nid in ordered:
@@ -55,13 +55,19 @@ def build_all_slides(
         if is_root:
             build_section_slide(prs, node["label"], node["kind"])
 
-        build_info_slide(prs, node, nodes, concept_map)
+        build_info_slide(prs, node, nodes, concept_map,
+                         instruction_text="Ajoutez ici les instructions d'annotation pour cette vue.")
 
         tag_names = node.get("tag_names", [])
         if tag_names:
-            build_concept_recap_slide(prs, node, images_dir=images_dir)
+            build_concept_recap_slide(prs, node, images_dir=images_dir,
+                                      title=f"{node['label']}  —  Vue d'Ensemble des Concepts")
 
             for concept_name in tag_names:
-                build_concept_detail_slide(prs, node, concept_name, images_dir=images_dir)
+                build_concept_detail_slide(
+                    prs, node, concept_name, images_dir=images_dir,
+                    n_good=4,
+                    examples_label="✓  Exemples",
+                )
 
     logger.info("Built %d slides total.", len(prs.slides))
