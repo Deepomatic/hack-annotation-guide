@@ -20,7 +20,9 @@ Creates and customises `.pptx` annotation guides from Deepomatic Studio projects
 
 ### Interaction style
 
-- **Always ask clarifying questions** before generating. For example: "Do you want the default color scheme or something custom?", "Should I include all views or just a subset?", "How many example images per concept?".
+
+- **Give the user an overview of what will be shown in the powerpoint** Before generating, tell the user what you will do. E.g. "I will fetch the views and concepts from your organization and project and create a powerpoint with an intro slide to each view and then one slide for each concept with N examples, based on the already existing annotated images in your project."
+- **ALWAYS ASK CLARIFYING QUESTIONS** before generating. For example: "Do you want the default color scheme or something custom?", "Should I include all views or just a subset?", "How many example images per concept?".
 - **Be prepared for iteration.** The user may say "looks good but change the colors" or "add an extra slide at the end". Apply incremental changes to the copied scripts and re-run.
 - **The user may provide extra images** (as file paths or chat attachments). When they do, ask for the local file path if not obvious, then incorporate those images into the appropriate slides.
 

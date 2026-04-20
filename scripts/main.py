@@ -367,9 +367,11 @@ def main(argv=None):
         logger.info("Loaded project map from %s", map_path)
         images_dir = None
     else:
+        org = args.org.lower()
+        project = args.project.lower()
         client = StudioClient(
-            org_slug=args.org,
-            project_slug=args.project,
+            org_slug=org,
+            project_slug=project,
             token=args.token,
             api_key=args.api_key,
             cluster=args.cluster,
@@ -377,7 +379,7 @@ def main(argv=None):
         project_map = client.fetch_project_map()
 
         # Download sample images for each view
-        images_dir = Path("images") / args.project
+        images_dir = Path("images") / project
         _download_sample_images(client, project_map, images_dir)
 
     # Generate the PPTX
