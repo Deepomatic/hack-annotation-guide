@@ -26,14 +26,14 @@ Creates and customises `.pptx` annotation guides from Deepomatic Studio projects
 
 ### Step 0 — Copy the scripts folder
 
-**Every time** the user asks to create or modify an annotation guide, start by copying the scripts into `scripts/generated/`:
+**Every time** the user asks to create or modify an annotation guide, always start by copying the scripts into `scripts/generated/`:
 
 ```bash
 mkdir -p scripts/generated
 cp scripts/*.py scripts/generated/
 ```
 
-All subsequent edits happen **only inside `scripts/generated/`**. The original `scripts/` folder is never modified.
+All subsequent edits happen **only inside `scripts/generated/`**. DO NOT modify the original `scripts/` folder under any circomstances!
 
 ### Step 1 — Make changes (prefer minimal edits)
 

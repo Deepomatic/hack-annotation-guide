@@ -95,7 +95,17 @@ def _download_sample_images(client: StudioClient, project_map: dict, images_dir:
 
 def _img_ext(region: dict) -> str:
     """Extract image extension from a region dict, defaulting to .jpg."""
-    orig = region.get("image", {}).get("data", {}).get("filename", "")
+    image = region.get("image", {})
+    data = image.get("data", {})
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+    orig = data.get("filename", "") if isinstance(data, dict) else ""
+    if not orig:
+        # Try to infer from the location field
+        orig = image.get("location", "")
     ext = Path(orig).suffix if orig else ".jpg"
     return ext or ".jpg"
 
