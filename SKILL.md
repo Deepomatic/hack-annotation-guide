@@ -70,20 +70,11 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 - `--map` (alternative to --org/--project): Path to a local project map JSON file
 - `--cluster` (optional): Studio cluster — `eu` (default) or `us`
 - `--output` (optional): Output file path (default: `annotation_guide.pptx`)
-- `--token` (optional): Studio Bearer token (or set `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US` env var, matching `--cluster`)
-- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY_EU` / `DEEPOMATIC_API_KEY_US` env var, matching `--cluster`)
+- `--token` (optional): Studio Bearer token (or set `DEEPOMATIC_TOKEN` env var)
+- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY` env var)
 
 ### Environment
-
-The API key is auto-selected based on `--cluster`:
-
-- `DEEPOMATIC_API_KEY_EU`: Studio API key for the EU cluster (used when `--cluster eu`, the default)
-- `DEEPOMATIC_API_KEY_US`: Studio API key for the US cluster (used when `--cluster us`)
-- `DEEPOMATIC_API_KEY`: Generic fallback if the cluster-specific one is not set
-
-Same pattern for `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US` / `DEEPOMATIC_TOKEN`.
-
-Store all of them in the `.env` file — the correct one will be picked up automatically.
+- `DEEPOMATIC_API_KEY`: Studio API key (stored in `.env` file)
 - For us cluster, use `DEEPOMATIC_API_KEY_US` (stored in `.env` file)
 
 ## Available helpers from `pptx_helper`
