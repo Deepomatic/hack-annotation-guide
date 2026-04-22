@@ -13,6 +13,7 @@ from pptx_helper import (
     build_section_slide, build_info_slide,
     build_concept_recap_slide, build_concept_detail_slide,
 )
+from studio_api import build_view_url
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ def build_all_slides(
     images_dir=None,
     org_slug: str = "",
     project_slug: str = "",
+    cluster: str = "eu",
     view_filter: set[str] | None = None,
 ):
     """Build the complete annotation guide slide deck (French).
@@ -61,8 +63,13 @@ def build_all_slides(
         if is_root:
             build_section_slide(prs, node["label"], node["kind"])
 
+        view_url = None
+        if org_slug and project_slug:
+            view_url = build_view_url(org_slug, project_slug, node["id"], cluster=cluster)
+
         build_info_slide(prs, node, nodes, concept_map,
-                         instruction_text="Ajoutez ici les instructions d'annotation pour cette vue.")
+                         instruction_text="Ajoutez ici les instructions d'annotation pour cette vue.",
+                         view_url=view_url)
 
         tag_names = node.get("tag_names", [])
         if tag_names:

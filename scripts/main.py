@@ -392,6 +392,7 @@ def main(argv=None):
         images_dir=images_dir,
         org_slug=org,
         project_slug=project,
+        cluster=args.cluster,
         view_filter=view_filter,
     )
     prs.save(str(output_path))

@@ -92,10 +92,14 @@ DEEPOMATIC_API_KEY_US=your_us_key_here
 ### Data helpers
 `build_tree`, `build_concept_map`, `resolve_conditions`, `dfs_order`, `find_view_images`, `match_images`, `compute_tree_positions`, `kind_color`, `sanitize_name`
 
+### Studio URL helper
+`build_view_url(org_slug, project_slug, view_id, cluster="eu")` from `studio_api` — returns the Studio web UI URL for a view. Used by `build_info_slide` (via `build_all_slides`) to render a clickable "Open in Studio" link on every view description slide.
+
 ### High-level slide builders
 `build_cover_slide`, `build_toc_slide`, `build_overview_slide`, `build_section_slide`, `build_info_slide`, `build_concept_recap_slide`, `build_concept_detail_slide`
 
 All slide builders accept keyword color overrides (e.g. `bg_color=`, `accent_color=`, `title_color=`).
+`build_info_slide` additionally accepts `view_url=` to render a clickable Studio link at the bottom of the slide. `build_all_slides` fills this in automatically for every view using `org_slug`, `project_slug` and `cluster`.
 
 ### Color constants
 `NAVY`, `NAVY_LIGHT`, `WHITE`, `LIGHT_BG`, `MUTED`, `DIVIDER`, `DARK_TEXT`, `ORANGE`, `TEAL`, `SKY_BLUE`, `GREEN`, `RED`, `PLACEHOLDER_BG`

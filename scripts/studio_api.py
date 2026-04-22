@@ -18,6 +18,22 @@ STUDIO_URLS = {
     "us": "https://studio.us1.deepomatic.com/api",
 }
 
+# Studio web UI base URLs, used to construct shareable links to views.
+STUDIO_UI_URLS = {
+    "eu": "https://studio.deepomatic.com",
+    "us": "https://studio.us1.deepomatic.com",
+}
+
+
+def build_view_url(org_slug: str, project_slug: str, view_id: str, cluster: str = "eu") -> str:
+    """Return the Studio web UI URL for a given view.
+
+    Used by the annotation guide to link the *Info* slide of each view back
+    to its Studio page so reviewers can jump straight to the source of truth.
+    """
+    base = STUDIO_UI_URLS.get(cluster, STUDIO_UI_URLS["eu"])
+    return f"{base}/en-US/{org_slug}/drive/projects-views/{project_slug}/views/{view_id}"
+
 
 class StudioClient:
     """Thin wrapper around Studio REST endpoints."""

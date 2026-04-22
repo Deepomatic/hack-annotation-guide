@@ -13,7 +13,7 @@ The output `.pptx` contains:
 3. **Views Overview** — tree diagram of the full view hierarchy
 4. **Per-view slides**:
    - **Section divider** (for root views) — navy gradient with kind badge
-   - **Info slide** — key-value metadata card (parent, activation conditions, children, concepts)
+   - **Info slide** — key-value metadata card (parent, activation conditions, children, concepts) plus a clickable **"Open in Studio"** link back to the view
    - **Concept recap** — grid overview of all concepts in the view with sample images
    - **Concept detail** — split slide with good examples (left) and bad examples (right) per concept
 
