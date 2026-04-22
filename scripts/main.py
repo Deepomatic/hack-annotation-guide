@@ -329,7 +329,7 @@ def _parse_args(argv=None):
     parser.add_argument(
         "--api-key",
         metavar="API_KEY",
-        help="Studio API key (or set DEEPOMATIC_API_KEY env var).",
+        help="Studio API key (or set DEEPOMATIC_API_KEY_EU env var for EU cluster, DEEPOMATIC_API_KEY_US for US cluster).",
     )
     parser.add_argument(
         "--cluster",

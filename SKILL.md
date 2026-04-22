@@ -75,6 +75,7 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 
 ### Environment
 - `DEEPOMATIC_API_KEY`: Studio API key (stored in `.env` file)
+- For us cluster, use `DEEPOMATIC_API_KEY_US` (stored in `.env` file)
 
 ## Available helpers from `pptx_helper`
 
