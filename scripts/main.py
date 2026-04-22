@@ -6,11 +6,8 @@ and generates a skeleton .pptx annotation guide.
 
 Usage
 -----
-  # From Studio API (requires DEEPOMATIC_TOKEN or DEEPOMATIC_API_KEY env var):
+  # Requires DEEPOMATIC_API_KEY env var:
   python main.py --org sandbox --project hackatono
-
-  # From a local map JSON file (e.g. exported from /views/map/):
-  python main.py --map project_map.json
 
   # Custom output path:
   python main.py --org sandbox --project hackatono --output my_guide.pptx
@@ -20,7 +17,6 @@ import argparse
 import io
 import json
 import logging
-import sys
 from pathlib import Path
 
 from PIL import Image
@@ -53,12 +49,20 @@ def _draw_bboxes(img: Image.Image, bboxes: list[dict], color=(255, 107, 53), thi
     return img
 
 
-def _download_sample_images(client: StudioClient, project_map: dict, images_dir: Path):
+def _download_sample_images(
+    client: StudioClient,
+    project_map: dict,
+    images_dir: Path,
+    view_filter: set[str] | None = None,
+):
     """Download sample images for each view, organised by view name.
 
     Strategy per view kind:
     - TAG / CLA: 2 images per concept.
     - DET: 2 images per concept with bbox overlays.
+
+    If *view_filter* is given (set of lowercase view labels), only download
+    images for those views. Skipped views produce no network calls.
     """
     images_dir.mkdir(parents=True, exist_ok=True)
     concept_map = {c["id"]: c["concept_name"] for c in project_map.get("concepts", [])}
@@ -73,6 +77,9 @@ def _download_sample_images(client: StudioClient, project_map: dict, images_dir:
     for node in project_map["nodes"]:
         view_id = node["id"]
         view_label = _sanitize(node["label"])
+        if view_filter is not None and node["label"].lower() not in view_filter:
+            logger.info("Skipping view %s (not in --views filter)", node["label"])
+            continue
         kind = node["data"].get("kind", "").upper()
         tag_ids: list[int] = node["data"].get("tag_ids", [])
         is_child_of_det = parent_kind.get(view_id) == "DET"
@@ -303,33 +310,22 @@ def _parse_args(argv=None):
         description="Generate a .pptx annotation guide from a Deepomatic Studio project."
     )
 
-    # Source: either API or local file
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument(
-        "--map",
-        metavar="MAP_JSON",
-        help="Path to a local project map JSON file.",
-    )
-    source.add_argument(
+    parser.add_argument(
         "--org",
+        required=True,
         metavar="ORG_SLUG",
-        help="Studio organisation slug (requires --project too).",
+        help="Studio organisation slug.",
     )
-
     parser.add_argument(
         "--project",
+        required=True,
         metavar="PROJECT_SLUG",
         help="Studio project slug.",
     )
     parser.add_argument(
-        "--token",
-        metavar="TOKEN",
-        help="Studio Bearer token (or set DEEPOMATIC_TOKEN env var).",
-    )
-    parser.add_argument(
         "--api-key",
         metavar="API_KEY",
-        help="Studio API key (or set DEEPOMATIC_API_KEY_EU env var for EU cluster, DEEPOMATIC_API_KEY_US for US cluster).",
+        help="Studio API key (or set DEEPOMATIC_API_KEY env var).",
     )
     parser.add_argument(
         "--cluster",
@@ -343,44 +339,47 @@ def _parse_args(argv=None):
         metavar="OUTPUT_PPTX",
         help="Destination .pptx file (default: annotation_guide.pptx).",
     )
+    parser.add_argument(
+        "--views",
+        default=None,
+        metavar="VIEW_LABELS",
+        help=(
+            "Comma-separated list of view labels to include (case-insensitive). "
+            "When set, only these views' images are downloaded and only their "
+            "slides are generated. Default: all views."
+        ),
+    )
 
-    args = parser.parse_args(argv)
-
-    if args.org and not args.project:
-        parser.error("--project is required when using --org")
-
-    return args
+    return parser.parse_args(argv)
 
 
 def main(argv=None):
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
     args = _parse_args(argv)
 
-    # Get the project map
-    if args.map:
-        map_path = Path(args.map)
-        if not map_path.is_file():
-            logger.error("Map file not found: %s", map_path)
-            sys.exit(1)
-        with map_path.open(encoding="utf-8") as fh:
-            project_map = json.load(fh)
-        logger.info("Loaded project map from %s", map_path)
-        images_dir = None
-    else:
-        org = args.org.lower()
-        project = args.project.lower()
-        client = StudioClient(
-            org_slug=org,
-            project_slug=project,
-            token=args.token,
-            api_key=args.api_key,
-            cluster=args.cluster,
-        )
-        project_map = client.fetch_project_map()
+    org = args.org.lower()
+    project = args.project.lower()
+    client = StudioClient(
+        org_slug=org,
+        project_slug=project,
+        api_key=args.api_key,
+        cluster=args.cluster,
+    )
+    project_map = client.fetch_project_map()
 
-        # Download sample images for each view
-        images_dir = Path("images") / project
-        _download_sample_images(client, project_map, images_dir)
+    # Parse optional --views filter (set of lowercase view labels)
+    view_filter: set[str] | None = None
+    if args.views:
+        view_filter = {v.strip().lower() for v in args.views.split(",") if v.strip()}
+        all_labels = {n["label"].lower() for n in project_map["nodes"]}
+        unknown = view_filter - all_labels
+        if unknown:
+            logger.warning("Unknown view labels in --views: %s", ", ".join(sorted(unknown)))
+        logger.info("View filter active: %s", ", ".join(sorted(view_filter)))
+
+    # Download sample images for each view
+    images_dir = Path("images") / project
+    _download_sample_images(client, project_map, images_dir, view_filter=view_filter)
 
     # Generate the PPTX
     output_path = Path(args.output)
@@ -391,8 +390,9 @@ def main(argv=None):
         prs,
         project_map,
         images_dir=images_dir,
-        org_slug=getattr(args, "org", "") or "",
-        project_slug=getattr(args, "project", "") or "",
+        org_slug=org,
+        project_slug=project,
+        view_filter=view_filter,
     )
     prs.save(str(output_path))
     print(f"✅ Done → {output_path}  ({len(prs.slides)} slides)")

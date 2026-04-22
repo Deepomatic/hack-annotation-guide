@@ -65,17 +65,24 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 ```
 
 ### Parameters
-- `--org` (required*): Studio organisation slug (e.g. `sandbox`)
-- `--project` (required with --org): Studio project slug (e.g. `hackatono`)
-- `--map` (alternative to --org/--project): Path to a local project map JSON file
+- `--org` (required): Studio organisation slug (e.g. `sandbox`)
+- `--project` (required): Studio project slug (e.g. `hackatono`)
 - `--cluster` (optional): Studio cluster — `eu` (default) or `us`
 - `--output` (optional): Output file path (default: `annotation_guide.pptx`)
-- `--token` (optional): Studio Bearer token (or set `DEEPOMATIC_TOKEN` env var)
-- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY` env var)
+- `--views` (optional): Comma-separated list of view labels (case-insensitive) to include. When set, **only images for those views are downloaded** and only their slides are generated. This dramatically speeds up generation for partial guides. Example: `--views "Bottle,Label"`.
+- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY` / `DEEPOMATIC_API_KEY_US` env var)
 
 ### Environment
-- `DEEPOMATIC_API_KEY`: Studio API key (stored in `.env` file)
-- For us cluster, use `DEEPOMATIC_API_KEY_US` (stored in `.env` file)
+The API key is selected based on `--cluster`:
+- `DEEPOMATIC_API_KEY`: Studio API key for the **EU** cluster (default)
+- `DEEPOMATIC_API_KEY_US`: Studio API key for the **US** cluster
+
+Both are stored in `.env` at the project root. Example:
+
+```dotenv
+DEEPOMATIC_API_KEY=your_eu_key_here
+DEEPOMATIC_API_KEY_US=your_us_key_here
+```
 
 ## Available helpers from `pptx_helper`
 
@@ -108,7 +115,9 @@ Generate for US cluster:
 uv run --env-file .env scripts/main.py --org sandbox --project hackatono --cluster us
 ```
 
-Generate from a local map file:
+Generate only for specific views (skips image downloads for other views — much faster):
 ```bash
-uv run --env-file .env scripts/main.py --map project_map.json --output my_guide.pptx
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono --views "Bottle,Label"
 ```
+
+> **Tip for the agent:** when the user says they only want certain views, pass them via `--views` instead of editing `build_pptx_slides.py`. This avoids downloading images for excluded views.

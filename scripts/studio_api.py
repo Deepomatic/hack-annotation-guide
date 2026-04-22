@@ -22,7 +22,7 @@ STUDIO_URLS = {
 class StudioClient:
     """Thin wrapper around Studio REST endpoints."""
 
-    def __init__(self, org_slug: str, project_slug: str, token: str | None = None, api_key: str | None = None, cluster: str = "eu"):
+    def __init__(self, org_slug: str, project_slug: str, api_key: str | None = None, cluster: str = "eu"):
         self.org_slug = org_slug
         self.project_slug = project_slug
         base_api = STUDIO_URLS.get(cluster, STUDIO_URLS["eu"])
@@ -30,21 +30,25 @@ class StudioClient:
         self.dataset_url = f"{self.base_url}/datasets/{project_slug}"
         logger.info("Using %s cluster: %s", cluster.upper(), base_api)
 
-        # Auth – prefer token, fall back to api_key, then env vars
-        token = token or os.getenv("DEEPOMATIC_TOKEN")
-        api_key = api_key or os.getenv("DEEPOMATIC_API_KEY")
-
-        headers: dict[str, str] = {}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        elif api_key:
-            headers["X-API-KEY"] = api_key
+        # Auth – API key per cluster.
+        # EU cluster uses DEEPOMATIC_API_KEY, US cluster uses DEEPOMATIC_API_KEY_US.
+        if api_key is None:
+            if cluster == "us":
+                api_key = os.getenv("DEEPOMATIC_API_KEY_US") or os.getenv("DEEPOMATIC_API_KEY")
+                env_var_name = "DEEPOMATIC_API_KEY_US"
+            else:
+                api_key = os.getenv("DEEPOMATIC_API_KEY")
+                env_var_name = "DEEPOMATIC_API_KEY"
         else:
+            env_var_name = "DEEPOMATIC_API_KEY"
+
+        if not api_key:
             raise ValueError(
-                "No authentication provided. Set DEEPOMATIC_TOKEN or DEEPOMATIC_API_KEY "
-                "environment variable, or pass token/api_key explicitly."
+                f"No authentication provided. Set {env_var_name} environment "
+                "variable, or pass api_key explicitly."
             )
 
+        headers = {"X-API-KEY": api_key}
         self._client = httpx.Client(headers=headers, timeout=30)
 
     # ------------------------------------------------------------------

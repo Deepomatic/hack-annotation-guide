@@ -24,6 +24,7 @@ def build_all_slides(
     images_dir=None,
     org_slug: str = "",
     project_slug: str = "",
+    view_filter: set[str] | None = None,
 ):
     """Build the complete annotation guide slide deck (French).
 
@@ -32,6 +33,9 @@ def build_all_slides(
       2. Info slide (metadata)
       3. Concept recap (grid overview of all concepts)
       4. Per-concept detail slides (4 good examples, no bad examples, with explanation)
+
+    If *view_filter* (lowercase view labels) is provided, only those views
+    generate per-view slides. Cover / TOC / Overview still list the full tree.
     """
     nodes, roots = build_tree(project_map)
     concept_map = build_concept_map(project_map)
@@ -50,6 +54,8 @@ def build_all_slides(
     # ── Per-view slides ──
     for nid in ordered:
         node = nodes[nid]
+        if view_filter is not None and node["label"].lower() not in view_filter:
+            continue
         is_root = not node["parent"] or node["parent"] not in nodes
 
         if is_root:
