@@ -30,9 +30,20 @@ class StudioClient:
         self.dataset_url = f"{self.base_url}/datasets/{project_slug}"
         logger.info("Using %s cluster: %s", cluster.upper(), base_api)
 
-        # Auth – prefer token, fall back to api_key, then env vars
-        token = token or os.getenv("DEEPOMATIC_TOKEN")
-        api_key = api_key or os.getenv("DEEPOMATIC_API_KEY")
+        # Auth – prefer explicit token/api_key, then cluster-specific env vars,
+        # then generic env vars. Cluster-specific vars are checked first so a
+        # single .env file can hold credentials for both clusters.
+        cluster_suffix = cluster.upper()
+        token = (
+            token
+            or os.getenv(f"DEEPOMATIC_TOKEN_{cluster_suffix}")
+            or os.getenv("DEEPOMATIC_TOKEN")
+        )
+        api_key = (
+            api_key
+            or os.getenv(f"DEEPOMATIC_API_KEY_{cluster_suffix}")
+            or os.getenv("DEEPOMATIC_API_KEY")
+        )
 
         headers: dict[str, str] = {}
         if token:
@@ -41,8 +52,9 @@ class StudioClient:
             headers["X-API-KEY"] = api_key
         else:
             raise ValueError(
-                "No authentication provided. Set DEEPOMATIC_TOKEN or DEEPOMATIC_API_KEY "
-                "environment variable, or pass token/api_key explicitly."
+                f"No authentication provided. Set DEEPOMATIC_API_KEY_{cluster_suffix} "
+                f"(or DEEPOMATIC_TOKEN_{cluster_suffix}) in your environment, or pass "
+                "token/api_key explicitly."
             )
 
         self._client = httpx.Client(headers=headers, timeout=30)
