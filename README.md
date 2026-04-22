@@ -37,9 +37,14 @@ scripts/
 # Install dependencies
 uv sync
 
-# Set your Studio API key
-echo 'DEEPOMATIC_API_KEY=your_key_here' > .env
+# Set your Studio API keys (one per cluster you use)
+cat > .env <<EOF
+DEEPOMATIC_API_KEY_EU=your_eu_key_here
+DEEPOMATIC_API_KEY_US=your_us_key_here
+EOF
 ```
+
+The correct key is picked automatically based on `--cluster` (defaults to `eu`). A generic `DEEPOMATIC_API_KEY` is still honoured as a fallback.
 
 ## Usage
 
@@ -58,8 +63,8 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 | `--map` | Path to local project map JSON (alternative to `--org`/`--project`) | — |
 | `--cluster` | Studio cluster: `eu` or `us` | `eu` |
 | `--output` | Output `.pptx` file path | `annotation_guide.pptx` |
-| `--token` | Studio Bearer token (or set `DEEPOMATIC_TOKEN` env var) | — |
-| `--api-key` | Studio API key (or set `DEEPOMATIC_API_KEY` env var) | — |
+| `--token` | Studio Bearer token (or set `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US`) | — |
+| `--api-key` | Studio API key (or set `DEEPOMATIC_API_KEY_EU` / `DEEPOMATIC_API_KEY_US`) | — |
 
 \* Either `--org` + `--project` or `--map` is required.
 

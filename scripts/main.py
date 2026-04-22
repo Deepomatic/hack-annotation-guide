@@ -324,12 +324,12 @@ def _parse_args(argv=None):
     parser.add_argument(
         "--token",
         metavar="TOKEN",
-        help="Studio Bearer token (or set DEEPOMATIC_TOKEN env var).",
+        help="Studio Bearer token (or set DEEPOMATIC_TOKEN_EU/DEEPOMATIC_TOKEN_US env var, matching --cluster).",
     )
     parser.add_argument(
         "--api-key",
         metavar="API_KEY",
-        help="Studio API key (or set DEEPOMATIC_API_KEY_EU env var for EU cluster, DEEPOMATIC_API_KEY_US for US cluster).",
+        help="Studio API key (or set DEEPOMATIC_API_KEY_EU/DEEPOMATIC_API_KEY_US env var, matching --cluster).",
     )
     parser.add_argument(
         "--cluster",
