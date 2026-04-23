@@ -13,7 +13,7 @@ The output `.pptx` contains:
 3. **Views Overview** — tree diagram of the full view hierarchy
 4. **Per-view slides**:
    - **Section divider** (for root views) — navy gradient with kind badge
-   - **Info slide** — key-value metadata card (parent, activation conditions, children, concepts)
+   - **Info slide** — key-value metadata card (parent, activation conditions, children, concepts) plus a clickable **"Open in Studio"** link back to the view
    - **Concept recap** — grid overview of all concepts in the view with sample images
    - **Concept detail** — split slide with good examples (left) and bad examples (right) per concept
 
@@ -37,14 +37,16 @@ scripts/
 # Install dependencies
 uv sync
 
-# Set your Studio API keys (one per cluster you use)
-cat > .env <<EOF
-DEEPOMATIC_API_KEY_EU=your_eu_key_here
+# Set your Studio API keys (one per cluster you plan to use)
+cat > .env <<'EOF'
+DEEPOMATIC_API_KEY=your_eu_key_here
 DEEPOMATIC_API_KEY_US=your_us_key_here
 EOF
 ```
 
-The correct key is picked automatically based on `--cluster` (defaults to `eu`). A generic `DEEPOMATIC_API_KEY` is still honoured as a fallback.
+The CLI automatically picks the right key based on `--cluster`:
+- `--cluster eu` (default) → uses `DEEPOMATIC_API_KEY`
+- `--cluster us` → uses `DEEPOMATIC_API_KEY_US`
 
 ## Usage
 
@@ -58,15 +60,11 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--org` | Studio organisation slug | required* |
-| `--project` | Studio project slug | required with `--org` |
-| `--map` | Path to local project map JSON (alternative to `--org`/`--project`) | — |
+| `--org` | Studio organisation slug | required |
+| `--project` | Studio project slug | required |
 | `--cluster` | Studio cluster: `eu` or `us` | `eu` |
 | `--output` | Output `.pptx` file path | `annotation_guide.pptx` |
-| `--token` | Studio Bearer token (or set `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US`) | — |
-| `--api-key` | Studio API key (or set `DEEPOMATIC_API_KEY_EU` / `DEEPOMATIC_API_KEY_US`) | — |
-
-\* Either `--org` + `--project` or `--map` is required.
+| `--api-key` | Studio API key (overrides env vars) | — |
 
 ### Examples
 
@@ -79,9 +77,6 @@ uv run --env-file .env scripts/main.py --org sandbox --project hackatono --outpu
 
 # US cluster
 uv run --env-file .env scripts/main.py --org sandbox --project hackatono --cluster us
-
-# From a local map JSON
-uv run --env-file .env scripts/main.py --map project_map.json
 ```
 
 ## Skill integration

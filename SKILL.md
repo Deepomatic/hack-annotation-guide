@@ -65,26 +65,24 @@ uv run --env-file .env scripts/main.py --org <ORG_SLUG> --project <PROJECT_SLUG>
 ```
 
 ### Parameters
-- `--org` (required*): Studio organisation slug (e.g. `sandbox`)
-- `--project` (required with --org): Studio project slug (e.g. `hackatono`)
-- `--map` (alternative to --org/--project): Path to a local project map JSON file
+- `--org` (required): Studio organisation slug (e.g. `sandbox`)
+- `--project` (required): Studio project slug (e.g. `hackatono`)
 - `--cluster` (optional): Studio cluster — `eu` (default) or `us`
 - `--output` (optional): Output file path (default: `annotation_guide.pptx`)
-- `--token` (optional): Studio Bearer token (or set `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US` env var, matching `--cluster`)
-- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY_EU` / `DEEPOMATIC_API_KEY_US` env var, matching `--cluster`)
+- `--views` (optional): Comma-separated list of view labels (case-insensitive) to include. When set, **only images for those views are downloaded** and only their slides are generated. This dramatically speeds up generation for partial guides. Example: `--views "Bottle,Label"`.
+- `--api-key` (optional): Studio API key (or set `DEEPOMATIC_API_KEY` / `DEEPOMATIC_API_KEY_US` env var)
 
 ### Environment
+The API key is selected based on `--cluster`:
+- `DEEPOMATIC_API_KEY`: Studio API key for the **EU** cluster (default)
+- `DEEPOMATIC_API_KEY_US`: Studio API key for the **US** cluster
 
-The API key is auto-selected based on `--cluster`:
+Both are stored in `.env` at the project root. Example:
 
-- `DEEPOMATIC_API_KEY_EU`: Studio API key for the EU cluster (used when `--cluster eu`, the default)
-- `DEEPOMATIC_API_KEY_US`: Studio API key for the US cluster (used when `--cluster us`)
-- `DEEPOMATIC_API_KEY`: Generic fallback if the cluster-specific one is not set
-
-Same pattern for `DEEPOMATIC_TOKEN_EU` / `DEEPOMATIC_TOKEN_US` / `DEEPOMATIC_TOKEN`.
-
-Store all of them in the `.env` file — the correct one will be picked up automatically.
-- For us cluster, use `DEEPOMATIC_API_KEY_US` (stored in `.env` file)
+```dotenv
+DEEPOMATIC_API_KEY=your_eu_key_here
+DEEPOMATIC_API_KEY_US=your_us_key_here
+```
 
 ## Available helpers from `pptx_helper`
 
@@ -94,10 +92,14 @@ Store all of them in the `.env` file — the correct one will be picked up autom
 ### Data helpers
 `build_tree`, `build_concept_map`, `resolve_conditions`, `dfs_order`, `find_view_images`, `match_images`, `compute_tree_positions`, `kind_color`, `sanitize_name`
 
+### Studio URL helper
+`build_view_url(org_slug, project_slug, view_id, cluster="eu")` from `studio_api` — returns the Studio web UI URL for a view. Used by `build_info_slide` (via `build_all_slides`) to render a clickable "Open in Studio" link on every view description slide.
+
 ### High-level slide builders
 `build_cover_slide`, `build_toc_slide`, `build_overview_slide`, `build_section_slide`, `build_info_slide`, `build_concept_recap_slide`, `build_concept_detail_slide`
 
 All slide builders accept keyword color overrides (e.g. `bg_color=`, `accent_color=`, `title_color=`).
+`build_info_slide` additionally accepts `view_url=` to render a clickable Studio link at the bottom of the slide. `build_all_slides` fills this in automatically for every view using `org_slug`, `project_slug` and `cluster`.
 
 ### Color constants
 `NAVY`, `NAVY_LIGHT`, `WHITE`, `LIGHT_BG`, `MUTED`, `DIVIDER`, `DARK_TEXT`, `ORANGE`, `TEAL`, `SKY_BLUE`, `GREEN`, `RED`, `PLACEHOLDER_BG`
@@ -117,7 +119,9 @@ Generate for US cluster:
 uv run --env-file .env scripts/main.py --org sandbox --project hackatono --cluster us
 ```
 
-Generate from a local map file:
+Generate only for specific views (skips image downloads for other views — much faster):
 ```bash
-uv run --env-file .env scripts/main.py --map project_map.json --output my_guide.pptx
+uv run --env-file .env scripts/main.py --org sandbox --project hackatono --views "Bottle,Label"
 ```
+
+> **Tip for the agent:** when the user says they only want certain views, pass them via `--views` instead of editing `build_pptx_slides.py`. This avoids downloading images for excluded views.

@@ -152,8 +152,12 @@ def add_textbox(
     alignment=PP_ALIGN.LEFT,
     word_wrap=True,
     vertical_anchor=MSO_ANCHOR.TOP,
+    hyperlink: str | None = None,
 ):
-    """Add a text box with a single styled run. Returns the shape."""
+    """Add a text box with a single styled run. Returns the shape.
+
+    If *hyperlink* is provided, the run is turned into a clickable link.
+    """
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     tf.word_wrap = word_wrap
@@ -172,6 +176,8 @@ def add_textbox(
     run.font.bold = bold
     run.font.italic = italic
     run.font.color.rgb = color
+    if hyperlink:
+        run.hyperlink.address = hyperlink
     return txBox
 
 
@@ -1099,6 +1105,7 @@ def build_info_slide(
     accent_color: RGBColor = None,
     instruction_text: str = "Add annotation instructions for this view here.",
     extra_fields: list[tuple[str, str]] | None = None,
+    view_url: str | None = None,
 ):
     """Info slide with key-value metadata in a card.
 
@@ -1107,6 +1114,8 @@ def build_info_slide(
         accent_color: Override per-kind accent.
         instruction_text: Placeholder text below the info card.
         extra_fields: Additional (label, value) pairs appended after defaults.
+        view_url: If provided, rendered as a clickable "Studio link" below
+            the info card so reviewers can open the view directly.
     """
     bg = bg_color or LIGHT_BG
     kind = node["kind"]
@@ -1165,6 +1174,21 @@ def build_info_slide(
         add_textbox(slide, card_left + Cm(1.5), card_top + card_h + Cm(0.8),
                     card_w - Cm(3), Cm(3), instruction_text,
                     font_size=FONT_SIZE_BODY, italic=True, color=MUTED)
+
+    if view_url:
+        # Clickable link back to the view in Studio. Rendered just above the
+        # bottom strip so it's always visible on the view description slide.
+        add_textbox(
+            slide,
+            card_left + Cm(1.5),
+            SLIDE_HEIGHT - Cm(1.4),
+            card_w - Cm(3),
+            Cm(0.6),
+            f"🔗  Open in Studio: {view_url}",
+            font_size=FONT_SIZE_CAPTION,
+            color=accent,
+            hyperlink=view_url,
+        )
 
     add_bottom_strip(slide, accent)
     return slide

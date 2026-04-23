@@ -18,11 +18,27 @@ STUDIO_URLS = {
     "us": "https://studio.us1.deepomatic.com/api",
 }
 
+# Studio web UI base URLs, used to construct shareable links to views.
+STUDIO_UI_URLS = {
+    "eu": "https://studio.deepomatic.com",
+    "us": "https://studio.us1.deepomatic.com",
+}
+
+
+def build_view_url(org_slug: str, project_slug: str, view_id: str, cluster: str = "eu") -> str:
+    """Return the Studio web UI URL for a given view.
+
+    Used by the annotation guide to link the *Info* slide of each view back
+    to its Studio page so reviewers can jump straight to the source of truth.
+    """
+    base = STUDIO_UI_URLS.get(cluster, STUDIO_UI_URLS["eu"])
+    return f"{base}/en-US/{org_slug}/drive/projects-views/{project_slug}/views/{view_id}"
+
 
 class StudioClient:
     """Thin wrapper around Studio REST endpoints."""
 
-    def __init__(self, org_slug: str, project_slug: str, token: str | None = None, api_key: str | None = None, cluster: str = "eu"):
+    def __init__(self, org_slug: str, project_slug: str, api_key: str | None = None, cluster: str = "eu"):
         self.org_slug = org_slug
         self.project_slug = project_slug
         base_api = STUDIO_URLS.get(cluster, STUDIO_URLS["eu"])
@@ -30,33 +46,25 @@ class StudioClient:
         self.dataset_url = f"{self.base_url}/datasets/{project_slug}"
         logger.info("Using %s cluster: %s", cluster.upper(), base_api)
 
-        # Auth – prefer explicit token/api_key, then cluster-specific env vars,
-        # then generic env vars. Cluster-specific vars are checked first so a
-        # single .env file can hold credentials for both clusters.
-        cluster_suffix = cluster.upper()
-        token = (
-            token
-            or os.getenv(f"DEEPOMATIC_TOKEN_{cluster_suffix}")
-            or os.getenv("DEEPOMATIC_TOKEN")
-        )
-        api_key = (
-            api_key
-            or os.getenv(f"DEEPOMATIC_API_KEY_{cluster_suffix}")
-            or os.getenv("DEEPOMATIC_API_KEY")
-        )
-
-        headers: dict[str, str] = {}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        elif api_key:
-            headers["X-API-KEY"] = api_key
+        # Auth – API key per cluster.
+        # EU cluster uses DEEPOMATIC_API_KEY, US cluster uses DEEPOMATIC_API_KEY_US.
+        if api_key is None:
+            if cluster == "us":
+                api_key = os.getenv("DEEPOMATIC_API_KEY_US") or os.getenv("DEEPOMATIC_API_KEY")
+                env_var_name = "DEEPOMATIC_API_KEY_US"
+            else:
+                api_key = os.getenv("DEEPOMATIC_API_KEY")
+                env_var_name = "DEEPOMATIC_API_KEY"
         else:
+            env_var_name = "DEEPOMATIC_API_KEY"
+
+        if not api_key:
             raise ValueError(
-                f"No authentication provided. Set DEEPOMATIC_API_KEY_{cluster_suffix} "
-                f"(or DEEPOMATIC_TOKEN_{cluster_suffix}) in your environment, or pass "
-                "token/api_key explicitly."
+                f"No authentication provided. Set {env_var_name} environment "
+                "variable, or pass api_key explicitly."
             )
 
+        headers = {"X-API-KEY": api_key}
         self._client = httpx.Client(headers=headers, timeout=30)
 
     # ------------------------------------------------------------------
